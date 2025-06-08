@@ -21,11 +21,8 @@ interface QRResult {
   };
 }
 
-interface OpenAIResult {
-  serialNumber?: string;
-  confidence?: string;
-  additionalInfo?: string;
-}
+// OpenAI result is now just a string containing the receipt number
+type OpenAIResult = string;
 
 interface GermanReceiptData {
   version: string;
@@ -111,7 +108,7 @@ function parseReceiptString(receiptString: string): GermanReceiptData | null {
 
 export default function QRScanner() {
   const [qrResult, setQrResult] = useState<QRResult | null>(null);
-  const [openAIResult, setOpenAIResult] = useState<OpenAIResult | null>(null);
+  const [openAIResult, setOpenAIResult] = useState<string | null>(null);
   const [germanReceipt, setGermanReceipt] = useState<GermanReceiptData | null>(
     null
   );
@@ -174,7 +171,7 @@ export default function QRScanner() {
 
   const extractSerialNumberWithAI = async (
     base64Image: string
-  ): Promise<OpenAIResult> => {
+  ): Promise<string> => {
     try {
       console.log("🤖 DEBUG: Starting OpenAI Vision analysis...");
       setDebugInfo("🤖 Analyzing image with AI for serial number...");
@@ -214,31 +211,16 @@ export default function QRScanner() {
       console.log("🤖 DEBUG: OpenAI response:", content);
 
       if (content) {
-        try {
-          const parsed = JSON.parse(content);
-          console.log("🤖 DEBUG: Parsed OpenAI result:", parsed);
-          return parsed;
-        } catch (parseError) {
-          console.error(
-            "🤖 DEBUG: Failed to parse OpenAI response as JSON:",
-            parseError
-          );
-          return {
-            serialNumber: content.substring(0, 100),
-            confidence: "low",
-            additionalInfo: "Raw response (not JSON)",
-          };
-        }
+        console.log("🤖 DEBUG: OpenAI response:", content);
+        return content.trim();
       }
 
-      return { additionalInfo: "No response from OpenAI" };
+      return "No response from OpenAI";
     } catch (error) {
       console.error("🤖 DEBUG: OpenAI Vision error:", error);
-      return {
-        additionalInfo: `Error: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`,
-      };
+      return `Error: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`;
     }
   };
 
@@ -396,10 +378,9 @@ export default function QRScanner() {
             setDebugInfo((prev) => `${prev} | 🤖 AI analysis complete`);
           } catch (aiError) {
             console.error("🤖 DEBUG: OpenAI analysis failed:", aiError);
-            setOpenAIResult({
-              additionalInfo:
-                "AI analysis failed. Check API key and connection.",
-            });
+            setOpenAIResult(
+              "AI analysis failed. Check API key and connection."
+            );
           } finally {
             setIsAnalyzingWithAI(false);
           }
@@ -407,11 +388,11 @@ export default function QRScanner() {
           console.log(
             "🤖 DEBUG: OpenAI API key not configured or invalid, skipping AI analysis"
           );
-          setOpenAIResult({
-            additionalInfo: openAIApiKey
+          setOpenAIResult(
+            openAIApiKey
               ? "Invalid OpenAI API key format. Please check your key."
-              : "OpenAI API key not configured. Enter your API key below to enable AI analysis.",
-          });
+              : "OpenAI API key not configured. Enter your API key below to enable AI analysis."
+          );
         }
       };
 
@@ -770,65 +751,29 @@ export default function QRScanner() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {openAIResult.serialNumber && (
+                {openAIResult && (
                   <div className="space-y-2">
                     <label className="text-sm font-medium">
-                      Serial Number:
+                      Receipt Number:
                     </label>
                     <div className="p-3 bg-green-50 rounded-lg border border-green-200">
                       <p className="font-mono text-sm break-all text-green-800">
-                        {openAIResult.serialNumber}
+                        {openAIResult}
                       </p>
                     </div>
                   </div>
                 )}
 
-                {openAIResult.confidence && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">
-                      Confidence Level:
-                    </label>
-                    <div className="p-2 bg-blue-50 rounded border border-blue-200">
-                      <span
-                        className={`text-xs px-2 py-1 rounded ${
-                          openAIResult.confidence === "high"
-                            ? "bg-green-100 text-green-800"
-                            : openAIResult.confidence === "medium"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {openAIResult.confidence.toUpperCase()}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {openAIResult.additionalInfo && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">
-                      Additional Information:
-                    </label>
-                    <div className="p-3 bg-gray-50 rounded-lg border">
-                      <p className="text-sm text-gray-700">
-                        {openAIResult.additionalInfo}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {openAIResult.serialNumber && (
+                {openAIResult && (
                   <div className="flex space-x-2">
                     <Button
                       onClick={() =>
-                        navigator.clipboard.writeText(
-                          openAIResult.serialNumber!
-                        )
+                        navigator.clipboard.writeText(openAIResult)
                       }
                       variant="outline"
                       size="sm"
                     >
-                      Copy Serial Number
+                      Copy Receipt Number
                     </Button>
                   </div>
                 )}
