@@ -675,35 +675,6 @@ export default function QRScanner() {
                   </div>
                 </div>
 
-                {/* VAT Breakdown */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">VAT Breakdown:</label>
-                  <div className="p-3 bg-gray-50 rounded-lg border">
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        Total: €
-                        {germanReceipt.receipt.vatBreakdown.total.toFixed(2)}
-                      </div>
-                      <div>
-                        0% VAT: €
-                        {germanReceipt.receipt.vatBreakdown.vat0.toFixed(2)}
-                      </div>
-                      <div>
-                        7% VAT: €
-                        {germanReceipt.receipt.vatBreakdown.vat7.toFixed(2)}
-                      </div>
-                      <div>
-                        19% VAT: €
-                        {germanReceipt.receipt.vatBreakdown.vat19.toFixed(2)}
-                      </div>
-                      <div>
-                        Other: €
-                        {germanReceipt.receipt.vatBreakdown.other.toFixed(2)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
                 {/* Transaction Details */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium">
@@ -711,10 +682,6 @@ export default function QRScanner() {
                   </label>
                   <div className="p-3 bg-gray-50 rounded-lg border space-y-2">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <strong>Receipt #:</strong>{" "}
-                        {germanReceipt.receiptCounter}
-                      </div>
                       <div>
                         <strong>Register ID:</strong> {germanReceipt.registerID}
                       </div>
