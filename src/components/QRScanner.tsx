@@ -74,7 +74,7 @@ function parseReceiptString(receiptString: string): GermanReceiptData | null {
     }
 
     // Fix: Don't reverse, payment string format is "amount:method"
-    const [amountStr, paymentMethod] = paymentString.split(":");
+    const [_, paymentMethod] = paymentString.split(":");
     // Use the VAT total as the authoritative total amount
     const totalAmount = vatComponents[0];
 
