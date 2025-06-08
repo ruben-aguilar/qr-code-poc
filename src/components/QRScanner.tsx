@@ -21,9 +21,6 @@ interface QRResult {
   };
 }
 
-// OpenAI result is now just a string containing the receipt number
-type OpenAIResult = string;
-
 interface GermanReceiptData {
   version: string;
   transactionUUID: string;
