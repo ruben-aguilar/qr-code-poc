@@ -27,9 +27,94 @@ interface OpenAIResult {
   additionalInfo?: string;
 }
 
+interface GermanReceiptData {
+  version: string;
+  transactionUUID: string;
+  documentType: string;
+  receipt: {
+    label: string;
+    vatBreakdown: {
+      total: number;
+      vat0: number;
+      vat7: number;
+      vat19: number;
+      other: number;
+    };
+    totalAmount: number;
+    paymentMethod: string;
+  };
+  receiptCounter: number;
+  registerID: string;
+  timestampStart: string;
+  timestampEnd: string;
+  signatureAlgorithm: string;
+  timeFormat: string;
+  signature: string;
+  certificateHash: string;
+}
+
+// German Receipt QR Code Parser
+function parseReceiptString(receiptString: string): GermanReceiptData | null {
+  try {
+    const parts = receiptString.split(";");
+
+    // Basic validation - German receipts should have at least 12 parts
+    if (parts.length < 12) {
+      return null;
+    }
+
+    const [label, vatString, paymentString] = parts[3].split("^");
+    if (!vatString || !paymentString) {
+      return null;
+    }
+
+    const vatComponents = vatString.split("_").map(Number);
+    if (vatComponents.length < 5) {
+      return null;
+    }
+
+    // Fix: Don't reverse, payment string format is "amount:method"
+    const [amountStr, paymentMethod] = paymentString.split(":");
+    // Use the VAT total as the authoritative total amount
+    const totalAmount = vatComponents[0];
+
+    return {
+      version: parts[0],
+      transactionUUID: parts[1],
+      documentType: parts[2],
+      receipt: {
+        label,
+        vatBreakdown: {
+          total: vatComponents[0],
+          vat0: vatComponents[1],
+          vat7: vatComponents[2],
+          vat19: vatComponents[3],
+          other: vatComponents[4],
+        },
+        totalAmount,
+        paymentMethod,
+      },
+      receiptCounter: parseInt(parts[4], 10),
+      registerID: parts[5],
+      timestampStart: parts[6],
+      timestampEnd: parts[7],
+      signatureAlgorithm: parts[8],
+      timeFormat: parts[9],
+      signature: parts[10],
+      certificateHash: parts[11],
+    };
+  } catch (error) {
+    console.error("Error parsing German receipt:", error);
+    return null;
+  }
+}
+
 export default function QRScanner() {
   const [qrResult, setQrResult] = useState<QRResult | null>(null);
   const [openAIResult, setOpenAIResult] = useState<OpenAIResult | null>(null);
+  const [germanReceipt, setGermanReceipt] = useState<GermanReceiptData | null>(
+    null
+  );
   const [error, setError] = useState<string>("");
   const [isScanning, setIsScanning] = useState(false);
   const [isAnalyzingWithAI, setIsAnalyzingWithAI] = useState(false);
@@ -107,17 +192,9 @@ export default function QRScanner() {
             content: [
               {
                 type: "text",
-                text: `Please analyze this ticket/document image and extract the serial number. Look for:
-                - Any serial numbers, ticket numbers, or reference numbers
-                - Barcodes or QR code content if visible
-                - Any alphanumeric identifiers that could be serial numbers
+                text: `What you see it's a german receipt. Please extract the serial number from the receipt.
                 
-                Respond in JSON format with:
-                {
-                  "serialNumber": "the extracted serial number or null if not found",
-                  "confidence": "high/medium/low based on how confident you are",
-                  "additionalInfo": "any other relevant information or numbers found"
-                }`,
+                Respond with just the serial number, nothing else.`,
               },
               {
                 type: "image_url",
@@ -191,6 +268,7 @@ export default function QRScanner() {
     setError("");
     setQrResult(null);
     setOpenAIResult(null);
+    setGermanReceipt(null);
     setDebugInfo("Starting file processing...");
 
     try {
@@ -283,6 +361,22 @@ export default function QRScanner() {
             data: result.data,
             location: result.location,
           });
+
+          // Try to parse as German receipt
+          const parsedReceipt = parseReceiptString(result.data);
+          if (parsedReceipt) {
+            console.log(
+              "🇩🇪 DEBUG: German receipt parsed successfully:",
+              parsedReceipt
+            );
+            setGermanReceipt(parsedReceipt);
+            setDebugInfo(
+              (prev) => `${prev} | 🇩🇪 German receipt detected and parsed!`
+            );
+          } else {
+            console.log("🇩🇪 DEBUG: QR code is not a German receipt format");
+            setGermanReceipt(null);
+          }
         } else {
           console.log("🔍 DEBUG: No QR code found in image");
           setDebugInfo(`❌ No QR code found (scanned in ${scanTime}ms)`);
@@ -345,6 +439,7 @@ export default function QRScanner() {
   const clearResults = () => {
     setQrResult(null);
     setOpenAIResult(null);
+    setGermanReceipt(null);
     setError("");
     setUploadedImage("");
     setDebugInfo("");
@@ -543,6 +638,154 @@ export default function QRScanner() {
                     </a>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          )}
+
+          {germanReceipt && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  🇩🇪 German Receipt Data
+                </CardTitle>
+                <CardDescription>
+                  Parsed German receipt information
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Receipt Summary */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Total Amount:</label>
+                    <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                      <p className="text-lg font-bold text-green-800">
+                        €{germanReceipt.receipt.totalAmount.toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Payment Method:
+                    </label>
+                    <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <p className="text-sm font-medium text-blue-800">
+                        {germanReceipt.receipt.paymentMethod}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* VAT Breakdown */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">VAT Breakdown:</label>
+                  <div className="p-3 bg-gray-50 rounded-lg border">
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        Total: €
+                        {germanReceipt.receipt.vatBreakdown.total.toFixed(2)}
+                      </div>
+                      <div>
+                        0% VAT: €
+                        {germanReceipt.receipt.vatBreakdown.vat0.toFixed(2)}
+                      </div>
+                      <div>
+                        7% VAT: €
+                        {germanReceipt.receipt.vatBreakdown.vat7.toFixed(2)}
+                      </div>
+                      <div>
+                        19% VAT: €
+                        {germanReceipt.receipt.vatBreakdown.vat19.toFixed(2)}
+                      </div>
+                      <div>
+                        Other: €
+                        {germanReceipt.receipt.vatBreakdown.other.toFixed(2)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Transaction Details */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    Transaction Details:
+                  </label>
+                  <div className="p-3 bg-gray-50 rounded-lg border space-y-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <strong>Receipt #:</strong>{" "}
+                        {germanReceipt.receiptCounter}
+                      </div>
+                      <div>
+                        <strong>Register ID:</strong> {germanReceipt.registerID}
+                      </div>
+                      <div>
+                        <strong>Version:</strong> {germanReceipt.version}
+                      </div>
+                      <div>
+                        <strong>Document Type:</strong>{" "}
+                        {germanReceipt.documentType}
+                      </div>
+                    </div>
+                    <div className="text-sm space-y-1">
+                      <div>
+                        <strong>Transaction ID:</strong>{" "}
+                        {germanReceipt.transactionUUID}
+                      </div>
+                      <div>
+                        <strong>Store/Label:</strong>{" "}
+                        {germanReceipt.receipt.label}
+                      </div>
+                      <div>
+                        <strong>Start Time:</strong>{" "}
+                        {germanReceipt.timestampStart}
+                      </div>
+                      <div>
+                        <strong>End Time:</strong> {germanReceipt.timestampEnd}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Technical Details */}
+                <details className="space-y-2">
+                  <summary className="text-sm font-medium cursor-pointer hover:text-blue-600">
+                    Technical Details (Click to expand)
+                  </summary>
+                  <div className="p-3 bg-gray-50 rounded-lg border mt-2">
+                    <div className="text-sm space-y-1">
+                      <div>
+                        <strong>Signature Algorithm:</strong>{" "}
+                        {germanReceipt.signatureAlgorithm}
+                      </div>
+                      <div>
+                        <strong>Time Format:</strong> {germanReceipt.timeFormat}
+                      </div>
+                      <div className="break-all">
+                        <strong>Signature:</strong> {germanReceipt.signature}
+                      </div>
+                      <div className="break-all">
+                        <strong>Certificate Hash:</strong>{" "}
+                        {germanReceipt.certificateHash}
+                      </div>
+                    </div>
+                  </div>
+                </details>
+
+                <div className="flex space-x-2">
+                  <Button
+                    onClick={() =>
+                      navigator.clipboard.writeText(
+                        JSON.stringify(germanReceipt, null, 2)
+                      )
+                    }
+                    variant="outline"
+                  >
+                    Copy Receipt Data
+                  </Button>
+                  <Button onClick={clearResults} variant="outline">
+                    Scan Another
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}

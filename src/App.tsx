@@ -11,6 +11,9 @@ function App() {
           <p className="text-gray-600">
             Upload an image with a QR code to extract its data
           </p>
+          <p className="text-sm text-blue-600 mt-2">
+            🇩🇪 Automatically detects and parses German receipt QR codes
+          </p>
         </div>
         <QRScanner />
       </div>
